@@ -150,4 +150,4 @@ docker rmi $IMAGE_ID
 docker rmi $ORI_ID
 
 
-echo "Build Successful! Output path:$Dest""
+echo "Build Successful! Output path:$Dest"
