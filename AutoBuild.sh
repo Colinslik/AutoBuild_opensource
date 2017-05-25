@@ -44,8 +44,8 @@ docker run -id --name $Container_ID orbweb/ubuntu64:v1 /bin/bash
 
 #=====clone all necessary parts=====
 docker exec -e Git_ID=$Git_ID -e Git_Passwd=$Git_Passwd $Container_ID bash -c 'cd /home/colin/git_home ; \
-git clone http://$Git_ID:$Git_Passwd@git.kloudian.com/gitadmin/nattraversal-client.git ; \
-git clone http://$Git_ID:$Git_Passwd@git.kloudian.com/harold.chen/libuv.git ; \
+git clone http://$Git_ID:$Git_Passwd@git.xxxxxxxx.com/xxxxxxx/nattraversal-client.git ; \
+git clone http://$Git_ID:$Git_Passwd@git.xxxxxxxx.com/xxxxxxx/libuv.git ; \
 git clone https://github.com/open-source-parsers/jsoncpp.git ; \
 git clone https://github.com/madler/zlib.git ; \
 git clone https://github.com/openssl/openssl.git ; \
