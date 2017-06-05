@@ -39,9 +39,9 @@ echo "Output Path:$Dest"
 
 #=====get Current image ID=====
 if [ "$Container_ID" = "asustor64" ]; then
-  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 /home/colin/dockerfiles/Asustor_64bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile 2>/dev/null | awk '/Successfully built/{print $NF}')
+  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 $(pwd)/Asustor_64bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile 2>/dev/null | awk '/Successfully built/{print $NF}')
 else
-  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 /home/colin/dockerfiles/Asustor_32bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile 2>/dev/null | awk '/Successfully built/{print $NF}')
+  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 $(pwd)/Asustor_32bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile 2>/dev/null | awk '/Successfully built/{print $NF}')
 fi
 
 echo $IMAGE_ID
