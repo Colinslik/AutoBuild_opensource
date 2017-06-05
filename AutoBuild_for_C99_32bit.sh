@@ -27,7 +27,7 @@ mkdir -p $Dest
 echo "Output Path:$Dest"
 
 #=====get Current image ID=====
-IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 /home/colin/dockerfiles/Ubuntu_32bit/ 2>/dev/null | awk '/Successfully built/{print $NF}')
+IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 $(pwd)/Ubuntu_32bit/ 2>/dev/null | awk '/Successfully built/{print $NF}')
 
 echo $IMAGE_ID
 
