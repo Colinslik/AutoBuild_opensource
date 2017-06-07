@@ -39,25 +39,41 @@ Local_User=XXX
 
 Local_Passwd=XXX
 
+TAG=1
+
 #=======================
 
 mkdir -p $Dest
 
 echo "Output Path:$Dest"
 
+while [[ ! -z $(docker images -q orbweb/$Container_ID:v$TAG) ]]
+do
+  TAG=$(($TAG + 1))
+done
+
 #=====get Current image ID=====
 
 if [ "$Container_ID" = "asustor64" ]; then
-  wget -P $Dest ftp://XXX.XXX.XXX.XXX/ubuntu64.tar --ftp-user="XXX" --ftp-password="XXX"
-  docker load -i $Dest/ubuntu64.tar
-  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 $(pwd)/Clean_64bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile --build-arg download="$Download_Path" --build-arg filename=$File_Name 2>/dev/null | awk '/Successfully built/{print $NF}')
+  if [ ! -f $Dest/ubuntu64.tar ]; then
+    wget -P $Dest ftp://XXX.XXX.XXX.XXX/ubuntu64.tar --ftp-user="XXX" --ftp-password="XXX"
+    docker load -i $Dest/ubuntu64.tar
+  fi
+  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v$TAG $(pwd)/Clean_64bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile --build-arg download="$Download_Path" --build-arg filename=$File_Name 2>/dev/null | awk '/Successfully built/{print $NF}')
 else
-  wget -P $Dest ftp://XXX.XXX.XXX.XXX/ubuntu32.tar --ftp-user="XXX" --ftp-password="XXX"
-  docker load -i $Dest/ubuntu32.tar
-  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v1 $(pwd)/Clean_32bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile --build-arg download="$Download_Path" --build-arg filename=$File_Name 2>/dev/null | awk '/Successfully built/{print $NF}')
+  if [ ! -f $Dest/ubuntu32.tar ]; then
+    wget -P $Dest ftp://XXX.XXX.XXX.XXX/ubuntu32.tar --ftp-user="XXX" --ftp-password="XXX"
+    docker load -i $Dest/ubuntu32.tar
+  fi
+  IMAGE_ID=$(docker build -t orbweb/$Container_ID:v$TAG $(pwd)/Clean_32bit/ --build-arg path=$Cross_Path --build-arg compile=$Cross_Compile --build-arg download="$Download_Path" --build-arg filename=$File_Name 2>/dev/null | awk '/Successfully built/{print $NF}')
 fi
 
 echo $IMAGE_ID
+
+if [ $(docker images | grep -c $IMAGE_ID) -gt 1 ]; then
+  docker images | grep $IMAGE_ID | awk '{print $1 ":" $2}'
+  docker rmi orbweb/$Container_ID:v$TAG
+fi
 
 #=====get Base image ID=====
 if [ "$Container_ID" = "asustor64" ]; then
@@ -66,16 +82,18 @@ else
   ORI_ID=$(docker images -q orbweb/ubuntu32)
 fi
 
+Container_Name=$(docker images | grep $IMAGE_ID | awk '{print $1 ":" $2}' | sed -e 's:.*/::g' -e 's:\::_:g')
+
 echo $ORI_ID
 
 #=====create docker in background=====
-docker run -id --name $Container_ID orbweb/$Container_ID:v1 /bin/bash
+docker run -id --name $Container_Name $IMAGE_ID /bin/bash
 
 #docker start $Container_ID
 
 
 #=====clone all necessary parts=====
-docker exec -e Git_ID=$Git_ID -e Git_Passwd=$Git_Passwd $Container_ID bash -c 'cd /home/colin/git_home ; \
+docker exec -e Git_ID=$Git_ID -e Git_Passwd=$Git_Passwd $Container_Name bash -c 'cd /home/colin/git_home ; \
 git clone http://$Git_ID:$Git_Passwd@git.XXX.com/XXX/nattraversal-client.git ; \
 git clone http://$Git_ID:$Git_Passwd@git.XXX.com/XXX/libuv.git ; \
 wget https://nchc.dl.sourceforge.net/project/axtls/2.1.3/axTLS-2.1.3.tar.gz ; \
@@ -84,11 +102,11 @@ git clone https://github.com/curl/curl.git
 '
 
 #=====change branch=====
-docker exec $Container_ID bash -c 'cd /home/colin/git_home/nattraversal-client ; git checkout pure-c99
+docker exec $Container_Name bash -c 'cd /home/colin/git_home/nattraversal-client ; git checkout pure-c99
 '
 
 #=====build open UV=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/libuv ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/libuv ; \
 sh autogen.sh ; export CFLAGS="-fPIC" ; ./configure --host=$CROSS_COMPILE; make ; make install \
 cp /home/colin/git_home/libuv/.libs/libuv.a /home/colin/git_home/nattraversal-client/3rd-party/libuv/lib/unix/x86 ; \
 expect -c "  
@@ -105,7 +123,7 @@ expect -c "
 #=====Keep for 32bit CPP code=====
 : <<'END'
 #=====build jsonCpp=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/jsoncpp ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/jsoncpp ; \
 git checkout 0.7.1 ; mkdir -p /home/colin/git_home/jsoncpp/output ; cd /home/colin/git_home/jsoncpp/output ; cmake ../ ; make ; \
 cp /home/colin/git_home/jsoncpp/output/lib/libjsoncpp.a /home/colin/git_home/nattraversal-client/3rd-party/jsoncpp/lib/linux/x86` ; \
 expect -c "
@@ -119,7 +137,7 @@ expect -c "
 "'
 
 #=====build libz=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/zlib ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/zlib ; \
 ./configure ; make ; make install ; cp /home/colin/git_home/zlib/libz.a /home/colin/git_home/nattraversal-client/3rd-party/libcURL/unix/x86 ; \
 expect -c "
    set timeout 1
@@ -132,7 +150,7 @@ expect -c "
 "'
 
 #=====build open ssl=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/openssl ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/openssl ; \
 ./config ; make ; make install ; \
 cp /home/colin/git_home/openssl/libssl.a /home/colin/git_home/nattraversal-client/3rd-party/libcURL/unix/x86 ; \
 cp /home/colin/git_home/openssl/libcrypto.a /home/colin/git_home/nattraversal-client/3rd-party/libcURL/unix/x86 ; \
@@ -409,7 +427,7 @@ echo "deps_config := \\
 #==========
 
 #=====build axTLS=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/axtls-code ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/axtls-code ; \
 expect -c "
    set timeout 1
    spawn scp $Local_User@$Local_IP:$Dest/config.h /home/colin/git_home/axtls-code/config
@@ -441,13 +459,13 @@ expect -c "
 "'
 
 #=====comment nonblocking entry=====
-docker exec $Container_ID sed -i 's:#define curlssl_connect_nonblocking Curl_axtls_connect_nonblocking://#define curlssl_connect_nonblocking Curl_axtls_connect_nonblocking:g' \
+docker exec $Container_Name sed -i 's:#define curlssl_connect_nonblocking Curl_axtls_connect_nonblocking://#define curlssl_connect_nonblocking Curl_axtls_connect_nonblocking:g' \
 /home/colin/git_home/curl/lib/vtls/axtls.h
 
 #==========
 
 #=====build curl=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/curl ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/curl ; \
 git checkout curl-7_54_0 ; ./buildconf ; export CFLAGS="-fPIC" ; \
 ./configure --host=$CROSS_COMPILE --without-ssl --disable-ftp --disable-gopher --disable-file --disable-imap --disable-ldap --disable-ldaps \
 --disable-pop3 --disable-proxy --disable-rtsp --disable-smtp --disable-telnet --disable-tftp --without-gnutls --disable-dict --with-axtls --disable-shared \
@@ -465,18 +483,18 @@ expect -c "
 
 
 #=====edit makefile link from openssl to axtls=====
-docker exec $Container_ID sed -i -e 's:\ \-lcurl:\ \-l\:libcurl.a:g' -e 's:\ \-luv:\ \-l\:libuv.a:g' -e 's:\ \-lssl:\ \-l\:libaxtls.a:g' -e 's:\ \-lcrypto::g' -e 's:\ \-lz::g' -e 's:\ \-lidn::g' -e 's/CC *= *gcc/#CC         = gcc/g' /home/colin/git_home/nattraversal-client/build/linux/Makefile 
+docker exec $Container_Name sed -i -e 's:\ \-lcurl:\ \-l\:libcurl.a:g' -e 's:\ \-luv:\ \-l\:libuv.a:g' -e 's:\ \-lssl:\ \-l\:libaxtls.a:g' -e 's:\ \-lcrypto::g' -e 's:\ \-lz::g' -e 's:\ \-lidn::g' -e 's/CC *= *gcc/#CC         = gcc/g' /home/colin/git_home/nattraversal-client/build/linux/Makefile 
 
-docker exec $Container_ID sed -i -e 's:\ \-lcurl:\ \-l\:libcurl.a:g' -e 's:\ \-luv:\ \-l\:libuv.a:g' -e 's:\ \-lssl:\ \-l\:libaxtls.a:g' -e 's:\ \-lcrypto::g' -e 's:\ \-lz::g' -e 's:\ \-lidn::g' -e 's/CPP *= *gcc/#CPP        = gcc/g' -e 's/CPP/CC/g' /home/colin/git_home/nattraversal-client/Samples/linux/Makefile
+docker exec $Container_Name sed -i -e 's:\ \-lcurl:\ \-l\:libcurl.a:g' -e 's:\ \-luv:\ \-l\:libuv.a:g' -e 's:\ \-lssl:\ \-l\:libaxtls.a:g' -e 's:\ \-lcrypto::g' -e 's:\ \-lz::g' -e 's:\ \-lidn::g' -e 's/CPP *= *gcc/#CPP        = gcc/g' -e 's/CPP/CC/g' /home/colin/git_home/nattraversal-client/Samples/linux/Makefile
 
-docker exec $Container_ID sed -i -e 's:\ -I......3rd-party\/libuv:\ -I/usr/local:g' -e 's:\ -I......3rd-party\/libcURL.*:\ -I/usr/local/include/curl:g' -e 's:\ -L.....\/.*:\ -L/usr/local/lib:g' /home/colin/git_home/nattraversal-client/build/linux/Makefile
+docker exec $Container_Name sed -i -e 's:\ -I......3rd-party\/libuv:\ -I/usr/local:g' -e 's:\ -I......3rd-party\/libcURL.*:\ -I/usr/local/include/curl:g' -e 's:\ -L.....\/.*:\ -L/usr/local/lib:g' /home/colin/git_home/nattraversal-client/build/linux/Makefile
 
-docker exec $Container_ID sed -i -e 's:\ -I......3rd-party\/libuv:\ -I/usr/local:g' -e 's:\ -I......3rd-party\/libcURL.*:\ -I/usr/local/include/curl:g' -e 's:\ -L.....\/.*:\ -L/usr/local/lib:g' /home/colin/git_home/nattraversal-client/Samples/linux/Makefile
+docker exec $Container_Name sed -i -e 's:\ -I......3rd-party\/libuv:\ -I/usr/local:g' -e 's:\ -I......3rd-party\/libcURL.*:\ -I/usr/local/include/curl:g' -e 's:\ -L.....\/.*:\ -L/usr/local/lib:g' /home/colin/git_home/nattraversal-client/Samples/linux/Makefile
 
 #==========
 
 #=====build target project=====
-docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_ID bash -c 'cd /home/colin/git_home/nattraversal-client/build/linux ; \
+docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/nattraversal-client/build/linux ; \
 make ; cp /home/colin/git_home/nattraversal-client/build/linux/liborbwebM2M.a /home/colin/git_home/nattraversal-client/Samples/linux ; \
 cd /home/colin/git_home/nattraversal-client/Samples/linux ; make ; \
 expect -c "
@@ -497,9 +515,9 @@ expect -c "
 
 
 #=====remove docker=====
-docker stop $Container_ID
+docker stop $Container_Name
 
-docker rm $Container_ID
+docker rm $Container_Name
 
 #=====remove images=====
 #docker rmi $IMAGE_ID
