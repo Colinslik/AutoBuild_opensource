@@ -107,7 +107,7 @@ docker exec $Container_Name bash -c 'cd /home/colin/git_home/nattraversal-client
 
 #=====build open UV=====
 docker exec -e Local_IP=$Local_IP -e Local_User=$Local_User -e Local_Passwd=$Local_Passwd -e Dest=$Dest $Container_Name bash -c 'cd /home/colin/git_home/libuv ; \
-sh autogen.sh ; export CFLAGS="-fPIC" ; ./configure --host=$CROSS_COMPILE; make ; make install \
+sh autogen.sh ; export CFLAGS="-fPIC" ; ./configure --host=$CROSS_COMPILE; make ; make install ; \
 cp /home/colin/git_home/libuv/.libs/libuv.a /home/colin/git_home/nattraversal-client/3rd-party/libuv/lib/unix/x86 ; \
 expect -c "  
    set timeout 1
